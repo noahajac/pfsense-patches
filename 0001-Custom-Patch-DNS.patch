@@ -1,0 +1,373 @@
+From 3dd17722591b9b74f3e19578e671427045efac1e Mon Sep 17 00:00:00 2001
+From: Noah Jacobson <noah@noahjacobson.com>
+Date: Tue, 21 Dec 2021 08:34:24 -0500
+Subject: [PATCH] Custom Patch: DNS
+
+---
+ src/etc/inc/services.inc                   | 79 +++++++++++++++++-----
+ src/etc/rc.carpbackup                      |  6 ++
+ src/etc/rc.carpmaster                      |  6 ++
+ src/usr/local/bin/openvpn-learn-address    | 70 +++++++++++++++++++
+ src/usr/local/www/services_dhcp_edit.php   | 28 ++++----
+ src/usr/local/www/services_dhcpv6_edit.php | 28 ++++----
+ 6 files changed, 174 insertions(+), 43 deletions(-)
+ create mode 100755 src/usr/local/bin/openvpn-learn-address
+
+diff --git a/src/etc/inc/services.inc b/src/etc/inc/services.inc
+index bd7e35259a..f0ec131536 100644
+--- a/src/etc/inc/services.inc
++++ b/src/etc/inc/services.inc
+@@ -775,7 +775,10 @@ EOPP;
+ 				$ptr_domain .= $revsubnet[$octet];
+ 			}
+ 			$ptr_domain .= ".in-addr.arpa";
+-			$newzone['ptr-domain'] = $ptr_domain;
++			// Custom Patch: DNS
++			//$newzone['ptr-domain'] = $ptr_domain;
++			$newzone['ptr-domain'] = "10.in-addr.arpa";
++			// End Path
+ 			unset($ptr_domain, $revsubnet, $start_octet);
+ 		}
+ 
+@@ -930,7 +933,10 @@ EOPP;
+ 				if (($poolconf['ddnsdomain'] <> "") && ($poolconf['ddnsdomain'] != $dhcpifconf['ddnsdomain'])) {
+ 					$pdnscfg .= "		ddns-domainname \"{$poolconf['ddnsdomain']}\";\n";
+ 				}
+-				$pdnscfg .= "		ddns-update-style interim;\n";
++				// Custom Patch: DNS
++				//$pdnscfg .= "		ddns-update-style interim;\n";
++				$pdnscfg .= "		ddns-update-style standard;\n";
++				// End Patch
+ 			}
+ 
+ 			$dhcpdconf .= "{$pdnscfg}";
+@@ -1161,6 +1167,10 @@ EOD;
+ 			}
+ 		}
+ 
++		// Custom Patch: DNS
++		$dhcpdconf .= "	ddns-updates off;\n";
++		// End Patch
++
+ 		$dhcpdconf .= <<<EOD
+ }
+ 
+@@ -1191,7 +1201,9 @@ EOD;
+ 
+ 				if ($sm['hostname']) {
+ 					$dhhostname = str_replace(" ", "_", $sm['hostname']);
+-					$dhhostname = str_replace(".", "_", $dhhostname);
++					// Custom Patch: DNS
++					//$dhhostname = str_replace(".", "_", $dhhostname);
++					// End Patch
+ 					$dhcpdconf .= "	option host-name \"{$dhhostname}\";\n";
+ 					if ((isset($dhcpifconf['ddnsupdate']) || isset($sm['ddnsupdate'])) && (isset($dhcpifconf['ddnsforcehostname']) || isset($sm['ddnsforcehostname']))) {
+ 						$dhcpdconf .= "	ddns-hostname \"{$dhhostname}\";\n";
+@@ -1224,7 +1236,10 @@ EOD;
+ 						$smdnscfg .= "	ddns-domainname \"{$sm['ddnsdomain']}\";\n";
+ 				 		$need_sm_ddns_updates = true;	
+ 					}
+-					$smdnscfg .= "	ddns-update-style interim;\n";
++					// Custom Patch: DNS
++					//$smdnscfg .= "	ddns-update-style interim;\n";
++					$smdnscfg .= "	ddns-update-style standard;\n";
++					// End Patch
+ 				}
+ 
+ 				if (is_array($sm['dnsserver']) && ($sm['dnsserver'][0]) && ($sm['dnsserver'][0] != $dhcpifconf['dnsserver'][0])) {
+@@ -1258,6 +1273,10 @@ EOD;
+ 					$dhcpdconf .= "	option tftp-server-name \"{$sm['tftp']}\";\n";
+ 				}
+ 
++				// Custom Patch: DNS
++				$dhcpdconf .= "	ddns-updates on;\n";
++				// End Patch
++
+ 				// Handle option, number rowhelper values
+ 				$dhcpdconf .= "\n";
+ 				if (isset($sm['numberoptions']['item']) && is_array($sm['numberoptions']['item'])) {
+@@ -1349,7 +1368,10 @@ EOD;
+ 	}
+ 
+ 	if ($need_ddns_updates) {
+-		$dhcpdconf .= "ddns-update-style interim;\n";
++		// Custom Patch: DNS
++		//$dhcpdconf .= "ddns-update-style interim;\n";
++		$dhcpdconf .= "ddns-update-style standard;\n";
++		// End Patch
+ 		$dhcpdconf .= "update-static-leases on;\n";
+ 
+ 		$dhcpdconf .= dhcpdzones($ddns_zones);
+@@ -1612,6 +1634,11 @@ EOD;
+ 					$dnscfgv6 .= "	option dhcp6.name-servers " . join(",", $dns_arrv6) . ";\n";
+ 				}
+ 			}
++
++			// Custom Patch: DNS
++			$dnscfgv6 .= "	ddns-updates off;\n";
++			// End Patch
++
+ 		} else {
+ 			$dnscfgv6 .= "	#option dhcp6.name-servers --;\n";
+ 		}
+@@ -1632,15 +1659,23 @@ EOD;
+ 			$newzone['ddnsdomainkey'] = $dhcpv6ifconf['ddnsdomainkey'];
+ 			$ddns_zones[] = $newzone;
+ 			if (isset($dhcpv6ifconf['ddnsreverse'])) {
+-				$ptr_zones = get_v6_ptr_zones($subnetv6, $ifcfgsnv6);
+-				foreach ($ptr_zones as $ptr_zone) {
+-					$reversezone = array();
+-					$reversezone['ptr-domain'] = $ptr_zone;
+-					$reversezone['dns-servers'] = array($dhcpv6ifconf['ddnsdomainprimary'], $dhcpv6ifconf['ddnsdomainsecondary']);
+-					$reversezone['ddnsdomainkeyname'] = $dhcpv6ifconf['ddnsdomainkeyname'];
+-					$reversezone['ddnsdomainkey'] = $dhcpv6ifconf['ddnsdomainkey'];
+-					$ddns_zones[] = $reversezone;
+-				}
++				// Custom Patch: DNS
++				//$ptr_zones = get_v6_ptr_zones($subnetv6, $ifcfgsnv6);
++				//foreach ($ptr_zones as $ptr_zone) {
++					//$reversezone = array();
++					//$reversezone['ptr-domain'] = $ptr_zone;
++					//$reversezone['dns-servers'] = array($dhcpv6ifconf['ddnsdomainprimary'], $dhcpv6ifconf['ddnsdomainsecondary']);
++					//$reversezone['ddnsdomainkeyname'] = $dhcpv6ifconf['ddnsdomainkeyname'];
++					//$reversezone['ddnsdomainkey'] = $dhcpv6ifconf['ddnsdomainkey'];
++					//$ddns_zones[] = $reversezone;
++				//}
++				$reversezone = array();
++				$reversezone['ptr-domain'] = "[REDACTED].ip6.arpa";
++				$reversezone['dns-servers'] = array($dhcpv6ifconf['ddnsdomainprimary'], $dhcpv6ifconf['ddnsdomainsecondary']);
++				$reversezone['ddnsdomainkeyname'] = $dhcpv6ifconf['ddnsdomainkeyname'];
++				$reversezone['ddnsdomainkey'] = $dhcpv6ifconf['ddnsdomainkey'];
++				$ddns_zones[] = $reversezone;
++				// End Patch
+ 			}
+ 		}
+ 
+@@ -1752,8 +1787,11 @@ EOD;
+ 
+ 				if ($sm['hostname']) {
+ 					$dhhostname = str_replace(" ", "_", $sm['hostname']);
+-					$dhhostname = str_replace(".", "_", $dhhostname);
+-					$dhcpdv6conf .= "	option host-name {$dhhostname};\n";
++					// Custom Patch: DNS
++					//$dhhostname = str_replace(".", "_", $dhhostname);
++					//$dhcpdv6conf .= "	option host-name {$dhhostname};\n";
++					$dhcpdv6conf .= "	option host-name \"{$dhhostname}\";\n";
++					// End Patch
+ 					if (isset($dhcpv6ifconf['ddnsupdate']) &&
+ 					    isset($dhcpv6ifconf['ddnsforcehostname'])) {
+ 						$dhcpdv6conf .= "	ddns-hostname \"{$dhhostname}\";\n";
+@@ -1767,6 +1805,10 @@ EOD;
+ 					$dhcpdv6conf .= "	option root-path \"{$sm['rootpath']}\";\n";
+ 				}
+ 
++				// Custom Patch: DNS
++				$dhcpdv6conf .= "	ddns-updates on;\n";
++				// End Patch
++
+ 				$dhcpdv6conf .= "}\n";
+ 				$i++;
+ 			}
+@@ -1798,7 +1840,10 @@ EOD;
+ 	}
+ 
+ 	if ($nsupdate) {
+-		$dhcpdv6conf .= "ddns-update-style interim;\n";
++		// Custom Patch: DNS
++		//$dhcpdv6conf .= "ddns-update-style interim;\n";
++		$dhcpdv6conf .= "ddns-update-style standard;\n";
++		// End Patch
+ 		$dhcpdv6conf .= "update-static-leases on;\n";
+ 	} else {
+ 		$dhcpdv6conf .= "ddns-update-style none;\n";
+diff --git a/src/etc/rc.carpbackup b/src/etc/rc.carpbackup
+index 1398130f5f..ce95c2c93b 100755
+--- a/src/etc/rc.carpbackup
++++ b/src/etc/rc.carpbackup
+@@ -49,6 +49,12 @@ if (!is_array($vips)) {
+ 	exit;
+ }
+ foreach ($vips as $vip) {
++	// Custom Patch: DNS
++	if ($vhid == 1) {
++		mwexec("/sbin/ifconfig {$iface} inet6 [REDACTED] prefixlen 64 alias delete");
++		mwexec("/sbin/ifconfig {$iface} -alias [REDACTED] netmask 255.255.254.0");
++	}
++	// End Patch
+ 	$notificationmsg = sprintf('HA cluster member "(%1$s@%2$s): (%3$s)" has resumed CARP state "BACKUP" for vhid %4$s',
+ 		$vip['subnet'], $iface, $friendly_descr, $vhid);
+ 
+diff --git a/src/etc/rc.carpmaster b/src/etc/rc.carpmaster
+index 65b48e0e77..bab193500f 100755
+--- a/src/etc/rc.carpmaster
++++ b/src/etc/rc.carpmaster
+@@ -50,6 +50,12 @@ if (!is_array($vips)) {
+ 	exit;
+ }
+ foreach ($vips as $vip) {
++	// Custom Patch: DNS
++	if ($vhid == 1) {
++		mwexec("/sbin/ifconfig {$iface} inet6 [REDACTED] prefixlen 64 alias");
++		mwexec("/sbin/ifconfig {$iface} [REDACTED] netmask 255.255.254.0 alias");
++	}
++	// End Patch
+ 	$notificationmsg = sprintf('HA cluster member "(%1$s@%2$s): (%3$s)" has resumed CARP state "MASTER" for vhid %4$s',
+ 	    $vip['subnet'], $iface, $friendly_descr, $vhid);
+ 
+diff --git a/src/usr/local/bin/openvpn-learn-address b/src/usr/local/bin/openvpn-learn-address
+new file mode 100755
+index 0000000000..d69574f585
+--- /dev/null
++++ b/src/usr/local/bin/openvpn-learn-address
+@@ -0,0 +1,70 @@
++#!/usr/bin/env bash
++# Custom Patch: DNS
++
++server=[REDACTED]
++keyName=[REDACTED]
++key=[REDACTED]
++forwardZone=[REDACTED]
++ttl=60
++
++operation=$1
++address=$2
++hostname=$3
++
++if [[ $address =~ .*:.* ]]; then
++  reverseRecord=`echo "$address" | awk -F: 'BEGIN {OFS=""; }{addCount = 9 - NF; for(i=1; i<=NF;i++){if(length($i) == 0){ for(j=1;j<=addCount;j++){$i = ($i "0000");} } else { $i = substr(("0000" $i), length($i)+5-4);}}; print}' | rev | sed -e "s/./&./g"`"ip6.arpa"
++  forwardRecordType=AAAA
++else
++  reverseRecord=`echo $address | sed -re 's:([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+):\4.\3.\2.\1.in-addr.arpa:'`
++  forwardRecordType=A
++fi
++
++if [ $operation == delete ]; then
++  forwardRecord=`dig +noall +answer +short -x $address | sed -e 's/\.$//'`
++else
++  forwardRecord=$hostname.$forwardZone
++fi
++
++addFile=/tmp/add_$address
++delFile=/tmp/del_$address
++
++logger "Received OpenVPN DDNS $operation command for $address"
++
++addRecord() {
++  echo "server $server" > $addFile
++  echo "key $keyName $key" >> $addFile
++  echo "update delete $forwardRecord $forwardRecordType" >> $addFile
++  echo "update add $forwardRecord $ttl $forwardRecordType $address" >> $addFile
++  echo "" >> $addFile
++  echo "update delete $reverseRecord PTR" >> $addFile
++  echo "update add $reverseRecord $ttl PTR $forwardRecord" >> $addFile
++  echo "send" >> $addFile
++  nsupdate -v $addFile
++  rm -f $addFile
++}
++
++deleteRecord() {
++  echo "server $server" > $delFile
++  echo "key $keyName $key" >> $delFile
++  if [[ $(dig +noall +answer +short $forwardRecordType $forwardRecord) = $address ]]; then
++    echo "update delete $forwardRecord $forwardRecordType" >> $delFile
++    echo "send" >> $delFile
++  fi
++  echo "update delete $reverseRecord PTR" >> $delFile
++  echo "send" >> $delFile
++  nsupdate -v $delFile
++  rm -f $delFile
++}
++
++case $operation in
++  add|update)
++    addRecord
++    ;;
++  delete)
++    deleteRecord
++    ;;
++  *)
++  exit
++esac
++# End Patch
++
+diff --git a/src/usr/local/www/services_dhcp_edit.php b/src/usr/local/www/services_dhcp_edit.php
+index a9817584b9..6e8fdc85a2 100644
+--- a/src/usr/local/www/services_dhcp_edit.php
++++ b/src/usr/local/www/services_dhcp_edit.php
+@@ -189,19 +189,21 @@ if ($_POST['save']) {
+ 	/* normalize MAC addresses - lowercase and convert Windows-ized hyphenated MACs to colon delimited */
+ 	$_POST['mac'] = strtolower(str_replace("-", ":", $_POST['mac']));
+ 
+-	if ($_POST['hostname']) {
+-		preg_match("/\-\$/", $_POST['hostname'], $matches);
+-		if ($matches) {
+-			$input_errors[] = gettext("The hostname cannot end with a hyphen according to RFC952");
+-		}
+-		if (!is_hostname($_POST['hostname'])) {
+-			$input_errors[] = gettext("The hostname can only contain the characters A-Z, 0-9 and '-'.");
+-		} else {
+-			if (!is_unqualified_hostname($_POST['hostname'])) {
+-				$input_errors[] = gettext("A valid hostname is specified, but the domain name part should be omitted");
+-			}
+-		}
+-	}
++	// Custom Patch: DNS
++	//if ($_POST['hostname']) {
++		//preg_match("/\-\$/", $_POST['hostname'], $matches);
++		//if ($matches) {
++			//$input_errors[] = gettext("The hostname cannot end with a hyphen according to RFC952");
++		//}
++		//if (!is_hostname($_POST['hostname'])) {
++			//$input_errors[] = gettext("The hostname can only contain the characters A-Z, 0-9 and '-'.");
++		//} else {
++			//if (!is_unqualified_hostname($_POST['hostname'])) {
++				//$input_errors[] = gettext("A valid hostname is specified, but the domain name part should be omitted");
++			//}
++		//}
++	//}
++	// End Patch
+ 
+ 	if (($_POST['ipaddr'] && !is_ipaddrv4($_POST['ipaddr']))) {
+ 		$input_errors[] = gettext("A valid IPv4 address must be specified.");
+diff --git a/src/usr/local/www/services_dhcpv6_edit.php b/src/usr/local/www/services_dhcpv6_edit.php
+index 71921d8cb3..4b302fce7c 100644
+--- a/src/usr/local/www/services_dhcpv6_edit.php
++++ b/src/usr/local/www/services_dhcpv6_edit.php
+@@ -94,19 +94,21 @@ if ($_POST['save']) {
+ 
+ 	do_input_validation($_POST, $reqdfields, $reqdfieldsn, $input_errors);
+ 
+-	if ($_POST['hostname']) {
+-		preg_match("/\-\$/", $_POST['hostname'], $matches);
+-		if ($matches) {
+-			$input_errors[] = gettext("The hostname cannot end with a hyphen according to RFC952");
+-		}
+-		if (!is_hostname($_POST['hostname'])) {
+-			$input_errors[] = gettext("The hostname can only contain the characters A-Z, 0-9 and '-'.");
+-		} else {
+-			if (!is_unqualified_hostname($_POST['hostname'])) {
+-				$input_errors[] = gettext("A valid hostname is specified, but the domain name part should be omitted");
+-			}
+-		}
+-	}
++	// Custom Patch: DNS
++	//if ($_POST['hostname']) {
++		//preg_match("/\-\$/", $_POST['hostname'], $matches);
++		//if ($matches) {
++			//$input_errors[] = gettext("The hostname cannot end with a hyphen according to RFC952");
++		//}
++		//if (!is_hostname($_POST['hostname'])) {
++			//$input_errors[] = gettext("The hostname can only contain the characters A-Z, 0-9 and '-'.");
++		//} else {
++			//if (!is_unqualified_hostname($_POST['hostname'])) {
++				//$input_errors[] = gettext("A valid hostname is specified, but the domain name part should be omitted");
++			//}
++		//}
++	//}
++	// End Patch
+ 
+ 	if ($_POST['ipaddrv6']) {
+ 		if (!is_ipaddrv6($_POST['ipaddrv6'])) {
+-- 
+2.31.1
+

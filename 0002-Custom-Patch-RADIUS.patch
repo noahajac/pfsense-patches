@@ -1,0 +1,27 @@
+From 0c85983b523581ce6af8b686941d0390ac1aa277 Mon Sep 17 00:00:00 2001
+From: Noah Jacobson <noah@noahjacobson.com>
+Date: Tue, 21 Dec 2021 08:19:26 -0500
+Subject: [PATCH] Custom Patch: RADIUS
+
+---
+ src/usr/local/pkg/freeradius.inc | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/usr/local/pkg/freeradius.inc b/src/usr/local/pkg/freeradius.inc
+index 3bf6541bde..b5b6561124 100644
+--- a/src/usr/local/pkg/freeradius.inc
++++ b/src/usr/local/pkg/freeradius.inc
+@@ -3429,7 +3429,9 @@ files {
+ }
+ 
+ files authorized_macs {
+-	key = "%{Calling-Station-ID}"
++	# Custom Patch: RADIUS
++	#key = "%{Calling-Station-ID}"
++	# End Path
+ 	usersfile = \${confdir}/authorized_macs
+ }
+ 
+-- 
+2.31.1
+
