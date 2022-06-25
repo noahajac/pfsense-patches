@@ -1,7 +1,7 @@
-From 0c85983b523581ce6af8b686941d0390ac1aa277 Mon Sep 17 00:00:00 2001
+From bf19ad736dc85f162ff99489db52dc735c7f7ed7 Mon Sep 17 00:00:00 2001
 From: Noah Jacobson <noah@noahjacobson.com>
-Date: Tue, 21 Dec 2021 08:19:26 -0500
-Subject: [PATCH] Custom Patch: RADIUS
+Date: Sat, 25 Jun 2022 09:55:49 -0400
+Subject: [PATCH] feat(custom patch): add custom FreeRADIUS config
 
 ---
  src/usr/local/pkg/freeradius.inc | 4 +++-
@@ -23,5 +23,5 @@ index 3bf6541bde..b5b6561124 100644
  }
  
 -- 
-2.31.1
+2.35.3
 

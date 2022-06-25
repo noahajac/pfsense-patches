@@ -1,7 +1,7 @@
-From 3dd17722591b9b74f3e19578e671427045efac1e Mon Sep 17 00:00:00 2001
+From dd9a70bd69a59666994a6fd120b78f3690508e5e Mon Sep 17 00:00:00 2001
 From: Noah Jacobson <noah@noahjacobson.com>
-Date: Tue, 21 Dec 2021 08:34:24 -0500
-Subject: [PATCH] Custom Patch: DNS
+Date: Sat, 25 Jun 2022 09:56:41 -0400
+Subject: [PATCH] feat(custom patch): add custom DNS configuration
 
 ---
  src/etc/inc/services.inc                   | 79 +++++++++++++++++-----
@@ -14,10 +14,10 @@ Subject: [PATCH] Custom Patch: DNS
  create mode 100755 src/usr/local/bin/openvpn-learn-address
 
 diff --git a/src/etc/inc/services.inc b/src/etc/inc/services.inc
-index bd7e35259a..f0ec131536 100644
+index 5c36da8f7b..b661251b41 100644
 --- a/src/etc/inc/services.inc
 +++ b/src/etc/inc/services.inc
-@@ -775,7 +775,10 @@ EOPP;
+@@ -789,7 +789,10 @@ EOPP;
  				$ptr_domain .= $revsubnet[$octet];
  			}
  			$ptr_domain .= ".in-addr.arpa";
@@ -29,7 +29,7 @@ index bd7e35259a..f0ec131536 100644
  			unset($ptr_domain, $revsubnet, $start_octet);
  		}
  
-@@ -930,7 +933,10 @@ EOPP;
+@@ -944,7 +947,10 @@ EOPP;
  				if (($poolconf['ddnsdomain'] <> "") && ($poolconf['ddnsdomain'] != $dhcpifconf['ddnsdomain'])) {
  					$pdnscfg .= "		ddns-domainname \"{$poolconf['ddnsdomain']}\";\n";
  				}
@@ -41,7 +41,7 @@ index bd7e35259a..f0ec131536 100644
  			}
  
  			$dhcpdconf .= "{$pdnscfg}";
-@@ -1161,6 +1167,10 @@ EOD;
+@@ -1208,6 +1214,10 @@ EOD;
  			}
  		}
  
@@ -52,7 +52,7 @@ index bd7e35259a..f0ec131536 100644
  		$dhcpdconf .= <<<EOD
  }
  
-@@ -1191,7 +1201,9 @@ EOD;
+@@ -1238,7 +1248,9 @@ EOD;
  
  				if ($sm['hostname']) {
  					$dhhostname = str_replace(" ", "_", $sm['hostname']);
@@ -63,7 +63,7 @@ index bd7e35259a..f0ec131536 100644
  					$dhcpdconf .= "	option host-name \"{$dhhostname}\";\n";
  					if ((isset($dhcpifconf['ddnsupdate']) || isset($sm['ddnsupdate'])) && (isset($dhcpifconf['ddnsforcehostname']) || isset($sm['ddnsforcehostname']))) {
  						$dhcpdconf .= "	ddns-hostname \"{$dhhostname}\";\n";
-@@ -1224,7 +1236,10 @@ EOD;
+@@ -1271,7 +1283,10 @@ EOD;
  						$smdnscfg .= "	ddns-domainname \"{$sm['ddnsdomain']}\";\n";
  				 		$need_sm_ddns_updates = true;	
  					}
@@ -75,7 +75,7 @@ index bd7e35259a..f0ec131536 100644
  				}
  
  				if (is_array($sm['dnsserver']) && ($sm['dnsserver'][0]) && ($sm['dnsserver'][0] != $dhcpifconf['dnsserver'][0])) {
-@@ -1258,6 +1273,10 @@ EOD;
+@@ -1305,6 +1320,10 @@ EOD;
  					$dhcpdconf .= "	option tftp-server-name \"{$sm['tftp']}\";\n";
  				}
  
@@ -86,7 +86,7 @@ index bd7e35259a..f0ec131536 100644
  				// Handle option, number rowhelper values
  				$dhcpdconf .= "\n";
  				if (isset($sm['numberoptions']['item']) && is_array($sm['numberoptions']['item'])) {
-@@ -1349,7 +1368,10 @@ EOD;
+@@ -1423,7 +1442,10 @@ EOD;
  	}
  
  	if ($need_ddns_updates) {
@@ -98,7 +98,7 @@ index bd7e35259a..f0ec131536 100644
  		$dhcpdconf .= "update-static-leases on;\n";
  
  		$dhcpdconf .= dhcpdzones($ddns_zones);
-@@ -1612,6 +1634,11 @@ EOD;
+@@ -1686,6 +1708,11 @@ EOD;
  					$dnscfgv6 .= "	option dhcp6.name-servers " . join(",", $dns_arrv6) . ";\n";
  				}
  			}
@@ -110,7 +110,7 @@ index bd7e35259a..f0ec131536 100644
  		} else {
  			$dnscfgv6 .= "	#option dhcp6.name-servers --;\n";
  		}
-@@ -1632,15 +1659,23 @@ EOD;
+@@ -1706,15 +1733,23 @@ EOD;
  			$newzone['ddnsdomainkey'] = $dhcpv6ifconf['ddnsdomainkey'];
  			$ddns_zones[] = $newzone;
  			if (isset($dhcpv6ifconf['ddnsreverse'])) {
@@ -143,7 +143,7 @@ index bd7e35259a..f0ec131536 100644
  			}
  		}
  
-@@ -1752,8 +1787,11 @@ EOD;
+@@ -1826,8 +1861,11 @@ EOD;
  
  				if ($sm['hostname']) {
  					$dhhostname = str_replace(" ", "_", $sm['hostname']);
@@ -157,7 +157,7 @@ index bd7e35259a..f0ec131536 100644
  					if (isset($dhcpv6ifconf['ddnsupdate']) &&
  					    isset($dhcpv6ifconf['ddnsforcehostname'])) {
  						$dhcpdv6conf .= "	ddns-hostname \"{$dhhostname}\";\n";
-@@ -1767,6 +1805,10 @@ EOD;
+@@ -1841,6 +1879,10 @@ EOD;
  					$dhcpdv6conf .= "	option root-path \"{$sm['rootpath']}\";\n";
  				}
  
@@ -168,7 +168,7 @@ index bd7e35259a..f0ec131536 100644
  				$dhcpdv6conf .= "}\n";
  				$i++;
  			}
-@@ -1798,7 +1840,10 @@ EOD;
+@@ -1872,7 +1914,10 @@ EOD;
  	}
  
  	if ($nsupdate) {
@@ -181,10 +181,10 @@ index bd7e35259a..f0ec131536 100644
  	} else {
  		$dhcpdv6conf .= "ddns-update-style none;\n";
 diff --git a/src/etc/rc.carpbackup b/src/etc/rc.carpbackup
-index 1398130f5f..ce95c2c93b 100755
+index 609eafc7bd..0eda719f45 100755
 --- a/src/etc/rc.carpbackup
 +++ b/src/etc/rc.carpbackup
-@@ -49,6 +49,12 @@ if (!is_array($vips)) {
+@@ -50,6 +50,12 @@ if (!is_array($vips)) {
  	exit;
  }
  foreach ($vips as $vip) {
@@ -198,10 +198,10 @@ index 1398130f5f..ce95c2c93b 100755
  		$vip['subnet'], $iface, $friendly_descr, $vhid);
  
 diff --git a/src/etc/rc.carpmaster b/src/etc/rc.carpmaster
-index 65b48e0e77..bab193500f 100755
+index db2f7fee41..39708b68de 100755
 --- a/src/etc/rc.carpmaster
 +++ b/src/etc/rc.carpmaster
-@@ -50,6 +50,12 @@ if (!is_array($vips)) {
+@@ -51,6 +51,12 @@ if (!is_array($vips)) {
  	exit;
  }
  foreach ($vips as $vip) {
@@ -291,10 +291,10 @@ index 0000000000..d69574f585
 +# End Patch
 +
 diff --git a/src/usr/local/www/services_dhcp_edit.php b/src/usr/local/www/services_dhcp_edit.php
-index a9817584b9..6e8fdc85a2 100644
+index 849f7a8a4a..1b6c4d8d40 100644
 --- a/src/usr/local/www/services_dhcp_edit.php
 +++ b/src/usr/local/www/services_dhcp_edit.php
-@@ -189,19 +189,21 @@ if ($_POST['save']) {
+@@ -191,19 +191,21 @@ if ($_POST['save']) {
  	/* normalize MAC addresses - lowercase and convert Windows-ized hyphenated MACs to colon delimited */
  	$_POST['mac'] = strtolower(str_replace("-", ":", $_POST['mac']));
  
@@ -330,7 +330,7 @@ index a9817584b9..6e8fdc85a2 100644
  	if (($_POST['ipaddr'] && !is_ipaddrv4($_POST['ipaddr']))) {
  		$input_errors[] = gettext("A valid IPv4 address must be specified.");
 diff --git a/src/usr/local/www/services_dhcpv6_edit.php b/src/usr/local/www/services_dhcpv6_edit.php
-index 71921d8cb3..4b302fce7c 100644
+index 8d49cb8dcd..4d70f786e5 100644
 --- a/src/usr/local/www/services_dhcpv6_edit.php
 +++ b/src/usr/local/www/services_dhcpv6_edit.php
 @@ -94,19 +94,21 @@ if ($_POST['save']) {
@@ -369,5 +369,5 @@ index 71921d8cb3..4b302fce7c 100644
  	if ($_POST['ipaddrv6']) {
  		if (!is_ipaddrv6($_POST['ipaddrv6'])) {
 -- 
-2.31.1
+2.35.3
 
