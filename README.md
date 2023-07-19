@@ -1,6 +1,6 @@
 # pfSense Patches
 
-Custom [pfSense](https://github.com/pfsense/pfsense) patches. These likely don't have use to anyone besides me. Currently for pfSense branch `RELENG_2_6_0`.
+Custom [pfSense](https://github.com/pfsense/pfsense) patches. These likely don't have use to anyone besides me. Currently for pfSense branch `RELENG_2_7_0`.
 
 * `DNS.patch`:
   * Adds [OpenVPN Learn Address](https://github.com/noahajac/openvpn-learn-address) to `/usr/local/bin/openvpn-learn-address`

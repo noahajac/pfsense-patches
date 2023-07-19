@@ -1,6 +1,6 @@
-From 9401d9fb682ed1ba9b75a22ca19754b64f93cd92 Mon Sep 17 00:00:00 2001
+From 118a36fb599b4cbc66ead9ac448815e94fc93f1d Mon Sep 17 00:00:00 2001
 From: Noah Jacobson <noah@noahjacobson.com>
-Date: Sat, 25 Jun 2022 10:51:59 -0400
+Date: Tue, 18 Jul 2023 20:41:34 -0400
 Subject: [PATCH] feat(custom patch): add custom FreeRADIUS config
 
 ---
@@ -8,20 +8,20 @@ Subject: [PATCH] feat(custom patch): add custom FreeRADIUS config
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/src/usr/local/pkg/freeradius.inc b/src/usr/local/pkg/freeradius.inc
-index adbd6d89b1..8179b74ef7 100644
+index 78b9057135..a20afaa5f1 100644
 --- a/src/usr/local/pkg/freeradius.inc
 +++ b/src/usr/local/pkg/freeradius.inc
-@@ -3429,7 +3429,9 @@ files {
+@@ -3320,7 +3320,9 @@ files {
  }
  
  files authorized_macs {
 -	key = "%{Calling-Station-ID}"
 +	# Custom Patch: RADIUS
-+	#key = "%{Calling-Station-ID}"
-+	# End Path
++	# key = "%{Calling-Station-ID}"
++	# End Patch
  	usersfile = \${confdir}/authorized_macs
  }
  
 -- 
-2.35.3
+2.39.1
 
